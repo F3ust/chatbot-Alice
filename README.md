@@ -65,13 +65,13 @@ You send a message. The backend splits uploaded files into 500-char chunks, embe
 
 File store results take priority. Matched chunks go into the system prompt. Ollama streams the response back as SSE.
 
-| Decision | What I chose | Alternative | Why |
-|----------|-------------|-------------|-----|
-| Retrieval | FAISS + nomic-embed-text | TF-IDF cosine | TF-IDF failed on paraphrased and cross-language queries. FAISS costs 274MB + ~200ms per index call, but retrieval went from "sometimes relevant" to correct top result |
-| LLM | qwen3.5:2b | 7B+ models | Fits in 2GB RAM, runs on CPU. Weak at multi-file attribution. 7B fixes that but raises hardware floor |
-| Context | 32K tokens | Smaller window | Max for qwen3.5. Slower generation, but retrieval quality matters more for file Q&A |
-| Sessions | In-memory dicts | SQLite / Redis | No database to configure. Data lost on restart. Acceptable for a demo with one evaluator |
-| Serving | Nginx | Vite dev server | Nginx handles static files, `/api` proxy, SSE buffering, and 50MB upload limit in one config |
+| Decision | Chose | Over | Why | Trade-off |
+|----------|-------|------|-----|-----------|
+| Retrieval | FAISS + nomic-embed-text | TF-IDF cosine | TF-IDF failed on paraphrased and cross-language queries | +274MB model download, +200ms per index call |
+| LLM | qwen3.5:2b | 7B+ models | Fits in 2GB RAM, runs on CPU | Weak at multi-file attribution |
+| Context | 32K tokens | Smaller window | Retrieval quality matters more for file Q&A | Slower generation on low-RAM machines |
+| Sessions | In-memory dicts | SQLite / Redis | No database to configure | Data lost on restart |
+| Serving | Nginx | Vite dev server | Handles static files, proxy, SSE, 50MB uploads in one config | Extra build stage in Dockerfile |
 
 ---
 
