@@ -1,0 +1,14 @@
+Alice (formerly ActiveFence) is a company that provides security, safety, and trust solutions for the GenAI era. Alice protects GenAI and UGC platforms with end-to-end trust, safety, and security.
+
+Alice's product suite is called WonderSuite. It includes three products:
+- WonderBuild: Pre-launch stress testing for AI models, apps, and agents. Prepares systems for responsible, resilient deployment.
+- WonderFence: Dynamic runtime guardrails. Keeps live apps and agents safe, secure, and aligned with policies and brand.
+- WonderCheck: Ongoing automated red-teaming. Evaluates production AI systems to detect drift, surface emerging risks, and prioritize remediation.
+
+Alice is powered by Rabbit Hole, the world's largest adversarial intelligence engine. Rabbit Hole is built on billions of toxic, manipulative, and abusive data samples and cross-cultural expert analysis. It adapts in real time, foreseeing emerging threats, surfacing unseen risks, and feeding guardrails.
+
+Alice protects over 3 billion users across more than 100 languages. The company serves industries including child-facing platforms and products, financial services, healthcare, insurance providers, and legal services.
+
+Alice's mission is to allow communicative technology to advance unafraid. Communicative technology includes every interactive digital system that lets people connect, create, or collaborate, with each other or with machines.
+
+Alice was formerly known as ActiveFence. The company's website is https://alice.io.

@@ -1,0 +1,90 @@
+@import "tailwindcss";
+
+/* Alice.io design tokens */
+@theme {
+  --color-alice-dark: #151718;
+  --color-alice-darker: #0e1011;
+  --color-alice-card: #1e2123;
+  --color-alice-border: #2a2d2f;
+  --color-alice-cream: #fcfaf6;
+  --color-alice-cream-dim: #b8b5af;
+  --color-alice-teal: #00838f;
+  --color-alice-teal-light: #00acc1;
+  --color-alice-pink: #d8729f;
+  --color-alice-pink-light: #e899b8;
+
+  --font-serif: "Playfair Display", Georgia, serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+}
+
+/* Global base */
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--color-alice-darker);
+  color: var(--color-alice-cream);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-alice-border);
+  border-radius: 3px;
+}
+
+/* Markdown inside AI messages */
+.prose-ai p { margin-bottom: 0.5rem; }
+.prose-ai p:last-child { margin-bottom: 0; }
+.prose-ai ul, .prose-ai ol { padding-left: 1.25rem; margin: 0.4rem 0; }
+.prose-ai pre {
+  background: #0e1011;
+  color: #cdd6f4;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  font-size: 0.85rem;
+  margin: 0.5rem 0;
+}
+.prose-ai code {
+  background: #2a2d2f;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+.prose-ai pre code {
+  background: transparent;
+  padding: 0;
+}
+.prose-ai table {
+  border-collapse: collapse;
+  margin: 0.5rem 0;
+  font-size: 0.85rem;
+}
+.prose-ai th, .prose-ai td {
+  border: 1px solid var(--color-alice-border);
+  padding: 0.4rem 0.6rem;
+}
+.prose-ai th {
+  background: var(--color-alice-card);
+  font-weight: 600;
+}
+
+/* Animations */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes bounce-dot {
+  0%, 60%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-5px); }
+}
