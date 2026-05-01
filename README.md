@@ -1,152 +1,140 @@
 # White Rabbit
 
-AI chatbot with file-based RAG. Upload PDF, TXT, or CSV files and ask questions about their content. Runs on a local Ollama model with FAISS semantic search.
+Chat with your files. Upload a PDF, TXT, or CSV, then ask questions. White Rabbit chunks the document, embeds it with FAISS, and feeds relevant pieces to a local LLM.
 
-React 19 + Tailwind v4 frontend. Python FastAPI backend. No cloud APIs.
+Everything runs locally. No API keys, no cloud.
 
----
+## Run it
 
-## Quick start
-
-### Local development
-
-Requires Python 3.11+, Node.js 20+, and [Ollama](https://ollama.com/download).
+### Docker (recommended)
 
 ```bash
-# Pull models
-ollama pull qwen3.5:2b
-ollama pull nomic-embed-text
-
-# Backend
-cd backend
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
-
-# Frontend (new terminal)
-cd frontend
-npm install
-npm run dev
-```
-
-Open http://localhost:5173. Vite proxies `/api/*` to the backend.
-
-### Docker
-
-No Python, Node, or Ollama install needed. Just Docker.
-
-```bash
-git clone <repo> && cd chatbot-forAlice
 docker compose up --build
 ```
 
-Open http://localhost:3000.
+http://localhost:3000. First boot pulls ~2GB of models.
 
-Startup order: Ollama → model pull → backend → frontend. First run downloads ~2GB for models. Model data persists in a Docker volume.
+### Pre-built images
 
-### Pre-built images (for reviewers)
-
-Download `docker-compose.prod.yml` and run:
+Grab `docker-compose.prod.yml` from this repo. Run:
 
 ```bash
 docker compose -f docker-compose.prod.yml up
 ```
 
-Images: `faust455/white-rabbit-backend`, `faust455/white-rabbit-frontend`.
+Images live at `faust455/white-rabbit-backend` and `faust455/white-rabbit-frontend` on Docker Hub.
+
+### Local dev
+
+You need Python 3.11+, Node 20+, and [Ollama](https://ollama.com/download).
+
+```bash
+ollama pull qwen3.5:2b
+ollama pull nomic-embed-text
+
+cd backend
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
+
+# second terminal
+cd frontend
+npm install && npm run dev
+```
+
+http://localhost:5173. Vite proxies `/api/*` to port 8000.
 
 ---
 
-## How it works
+## Architecture
 
 ```
 Browser ──POST──▶ FastAPI ──HTTP──▶ Ollama (qwen3.5:2b)
         ◀──SSE───          ◀────────
-
                    │
                    ▼
-             FAISS + nomic-embed-text
-             (semantic chunk retrieval)
+            FAISS + nomic-embed-text
 ```
 
-1. User sends a message or uploads a file.
-2. Files are chunked (500 chars, 100 overlap) and embedded with `nomic-embed-text`.
-3. On each message, FAISS searches the user's file store and a shared knowledge base.
-4. Matching chunks are injected into the system prompt.
-5. Ollama generates a response, streamed back over SSE.
+You send a message. The backend splits uploaded files into 500-char chunks, embeds them with `nomic-embed-text`, and indexes them in FAISS. Each message triggers a similarity search against two stores:
 
-### RAG pipeline
+| Store | Source | Threshold |
+|-------|--------|-----------|
+| File store (per session) | Your uploads | 0.05, falls back to top N chunks |
+| Knowledge base (shared) | `backend/knowledge/*.txt` | 0.35 |
 
-| Store | Source | Threshold | Behavior |
-|-------|--------|-----------|----------|
-| **File store** (per session) | User uploads | 0.05 (fallback: top N chunks) | High priority |
-| **Knowledge base** (shared) | `backend/knowledge/*.txt` | 0.35 | Low priority |
+File store results take priority. Matched chunks go into the system prompt. Ollama streams the response back as SSE.
 
-### Key decisions
-
-| Choice | Reason |
-|--------|--------|
-| Ollama + qwen3.5:2b | Local, free, runs on low-end hardware |
-| FAISS + nomic-embed-text | Semantic search across languages |
-| 32K context window | Fits large file chunks + conversation history |
-| In-memory sessions | No database setup. Sessions reset on restart |
-| Separate file/knowledge stores | Prevents company knowledge from overshadowing uploads |
-| SSE streaming | Tokens appear as the model generates them |
+| Decision | What I chose | Alternative | Why |
+|----------|-------------|-------------|-----|
+| Retrieval | FAISS + nomic-embed-text | TF-IDF cosine | TF-IDF failed on paraphrased and cross-language queries. FAISS costs 274MB + ~200ms per index call, but retrieval went from "sometimes relevant" to correct top result |
+| LLM | qwen3.5:2b | 7B+ models | Fits in 2GB RAM, runs on CPU. Weak at multi-file attribution. 7B fixes that but raises hardware floor |
+| Context | 32K tokens | Smaller window | Max for qwen3.5. Slower generation, but retrieval quality matters more for file Q&A |
+| Sessions | In-memory dicts | SQLite / Redis | No database to configure. Data lost on restart. Acceptable for a demo with one evaluator |
+| Serving | Nginx | Vite dev server | Nginx handles static files, `/api` proxy, SSE buffering, and 50MB upload limit in one config |
 
 ---
 
 ## API
 
-| Method | Endpoint | Description |
+| Method | Endpoint | What it does |
 |--------|----------|-------------|
-| POST | `/api/chat/stream` | Stream a chat response (SSE) |
-| POST | `/api/chat` | Non-streaming chat (fallback) |
-| POST | `/api/upload?session_id=` | Upload PDF/TXT/CSV |
-| GET | `/api/history/{session_id}` | Conversation history |
-| DELETE | `/api/history/{session_id}` | Clear session |
-| GET | `/api/health` | Server + Ollama status |
+| POST | `/api/chat/stream` | SSE chat stream |
+| POST | `/api/chat` | Non-streaming chat |
+| POST | `/api/upload?session_id=` | Index a PDF, TXT, or CSV |
+| GET | `/api/history/{session_id}` | Fetch conversation |
+| DELETE | `/api/history/{session_id}` | Wipe session |
+| GET | `/api/health` | Ollama connectivity check |
 
 ---
 
-## Project structure
+## Files
 
 ```
 backend/
-  main.py              Routes, sessions, RAG context building
-  llm.py               Ollama HTTP client (chat + streaming)
-  rag.py               FAISS chunking and retrieval
-  file_processor.py    PDF / TXT / CSV text extraction
-  models.py            Pydantic request/response schemas
-  knowledge/           Pre-loaded .txt files indexed on startup
-  tests/               pytest suite (parser + RAG)
+  main.py              Routes, sessions, context assembly
+  llm.py               Ollama client (sync + streaming)
+  rag.py               FAISS indexing and retrieval
+  file_processor.py    PDF / TXT / CSV extraction
+  models.py            Pydantic schemas
+  knowledge/           .txt files loaded at startup
+  tests/               pytest (parser + RAG)
 
 frontend/
   src/
-    App.tsx            Chat UI, state management, streaming
-    index.css          Tailwind v4 config + design tokens
+    App.tsx            State, streaming, layout
     components/
-      ChatMessage.tsx  Message bubble with markdown rendering
-      ChatInput.tsx    Text input with Shift+Enter support
-      FileUpload.tsx   File picker (PDF, TXT, CSV)
-    services/api.ts    SSE reader + upload client
-    types/index.ts     TypeScript interfaces
+      ChatMessage.tsx  Markdown message bubble
+      ChatInput.tsx    Textarea with Shift+Enter
+      FileUpload.tsx   File picker
+    services/api.ts    SSE reader, upload, session clear
+    types/index.ts     Interfaces
 
-docker-compose.yml       Dev: builds from source
-docker-compose.prod.yml  Prod: pulls from Docker Hub
-PROBLEMS.md              Bugs encountered and fixes applied
+docker-compose.yml       Build from source
+docker-compose.prod.yml  Pull from Docker Hub
 ```
 
 ## Config
 
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server address |
-| `OLLAMA_MODEL` | `qwen3.5:2b` | Chat model |
-| `OLLAMA_NUM_CTX` | `32768` | Context window size |
+| Variable | Default | Controls |
+|----------|---------|----------|
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama address |
+| `OLLAMA_MODEL` | `qwen3.5:2b` | Which model to chat with |
+| `OLLAMA_NUM_CTX` | `32768` | Token context window |
 
 ## Tests
 
 ```bash
-cd backend
-python -m pytest tests/ -v
+cd backend && python -m pytest tests/ -v
 ```
+
+12 tests: 8 cover file parsing (TXT, CSV, PDF, edge cases), 4 cover FAISS indexing and retrieval.
+
+## With more time
+
+- **Persistent storage.** FAISS `save_local`/`load_local` + SQLite for history. Sessions would survive restarts.
+- **Auth.** Per-user sessions with token-based login. Right now any visitor shares the same pool.
+- **Smarter chunking.** Markdown-aware and code-aware splitting instead of fixed 500-char windows.
+- **E2E tests.** Playwright covering upload, chat, streaming, and session clear.
+- **GPU passthrough.** Docker compose with `deploy.resources.reservations.devices` for NVIDIA. Cuts generation time 5-10x.
+
